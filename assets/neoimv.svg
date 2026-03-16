@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background -->
+  <rect width="64" height="64" rx="8" ry="8" fill="#1a1a2e"/>
+  <!-- Image frame -->
+  <rect x="8" y="12" width="48" height="36" rx="3" ry="3" fill="none" stroke="#7c8cf8" stroke-width="2.5"/>
+  <!-- Mountain shape (image placeholder icon) -->
+  <polygon points="16,40 28,24 34,32 40,26 52,40" fill="#7c8cf8" opacity="0.7"/>
+  <!-- Sun circle -->
+  <circle cx="42" cy="22" r="5" fill="#f8c97c"/>
+  <!-- "neoimv" label area -->
+  <rect x="8" y="52" width="48" height="8" rx="2" ry="2" fill="#7c8cf8" opacity="0.2"/>
+</svg>

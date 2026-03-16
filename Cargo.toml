@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "neoimv",
+    "neoimv-plugin-sdk",
+    "plugins/rotate",
+    "plugins/drawer",
+    "tests/integration/test_plugin",
+]
+resolver = "2"

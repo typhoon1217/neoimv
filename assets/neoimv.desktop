@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=neoimv
+Comment=Plugin-based image viewer
+Exec=neoimv %f
+Icon=neoimv
+Terminal=false
+Type=Application
+Categories=Graphics;Viewer;
+MimeType=image/png;image/jpeg;image/gif;image/webp;image/bmp;image/tiff;
