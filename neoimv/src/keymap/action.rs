@@ -32,6 +32,11 @@ impl ActionRegistry {
             ("core:quit", "Quit", "Application"),
             ("core:undo", "Undo", "Edit"),
             ("core:redo", "Redo", "Edit"),
+            ("core:copy_image", "Copy Image", "Edit"),
+            ("core:copy_path", "Copy File Path", "Edit"),
+            ("core:rename_file", "Rename File", "File"),
+            ("core:rotate_cw", "Rotate Clockwise", "Transform"),
+            ("core:rotate_ccw", "Rotate Counterclockwise", "Transform"),
             ("core:save", "Save", "File"),
             ("core:save_as", "Save As", "File"),
         ];

@@ -10,6 +10,7 @@ use crate::core::background_loader::{BackgroundLoader, LoadResult, PluginDecoder
 use crate::core::filmstrip::Filmstrip;
 use crate::core::fonts;
 use crate::core::image_loader::{load_image_animated, LoadedImage};
+use crate::core::image_ops::{rotate_rgba_ccw, rotate_rgba_cw};
 use crate::core::navigator::Navigator;
 use crate::core::renderer::{FitMode, ImageRenderer};
 use crate::core::save::{save_as_dialog, save_image};
@@ -50,6 +51,10 @@ pub struct NeoimvApp {
 
     // Current pixel buffer (for undo/save/plugins)
     current_pixels: Vec<u8>,
+
+    // Rename dialog
+    rename_open: bool,
+    rename_name: String,
 
     // Filmstrip
     filmstrip: Filmstrip,
@@ -148,6 +153,8 @@ impl NeoimvApp {
             animation: None,
             undo_stack,
             current_pixels: Vec::new(),
+            rename_open: false,
+            rename_name: String::new(),
             filmstrip,
             window_state,
             window_state_path,
@@ -300,6 +307,10 @@ impl NeoimvApp {
 
     /// Process all key events this frame and dispatch actions.
     fn handle_input(&mut self, ctx: &egui::Context) {
+        if self.rename_open || ctx.wants_keyboard_input() {
+            return;
+        }
+
         let key_events: Vec<(egui::Key, egui::Modifiers)> = ctx.input(|i| {
             i.events
                 .iter()
@@ -404,6 +415,21 @@ impl NeoimvApp {
                         .broadcast_event("core:image_changed", &plugin_ctx);
                 }
             }
+            "core:copy_image" => {
+                self.copy_current_image(ctx);
+            }
+            "core:copy_path" => {
+                self.copy_current_path(ctx);
+            }
+            "core:rename_file" => {
+                self.open_rename_dialog();
+            }
+            "core:rotate_cw" => {
+                self.rotate_current(ctx, true);
+            }
+            "core:rotate_ccw" => {
+                self.rotate_current(ctx, false);
+            }
             "core:save" => {
                 if let (Some(path), pixels) = (&self.current_path.clone(), &self.current_pixels.clone()) {
                     if !pixels.is_empty() {
@@ -433,6 +459,128 @@ impl NeoimvApp {
                 self.dispatch_plugin_action(ctx, other);
             }
         }
+    }
+
+    fn copy_current_image(&self, ctx: &egui::Context) {
+        if let Some(frame) = self.animation.as_ref().and_then(|anim| anim.current_frame()) {
+            ctx.copy_image(egui::ColorImage::from_rgba_unmultiplied(
+                [frame.width as usize, frame.height as usize],
+                &frame.pixels,
+            ));
+            return;
+        }
+
+        let expected_len = (self.image_width as usize)
+            .checked_mul(self.image_height as usize)
+            .and_then(|px| px.checked_mul(4));
+        if expected_len == Some(self.current_pixels.len()) {
+            ctx.copy_image(egui::ColorImage::from_rgba_unmultiplied(
+                [self.image_width as usize, self.image_height as usize],
+                &self.current_pixels,
+            ));
+        }
+    }
+
+    fn copy_current_path(&self, ctx: &egui::Context) {
+        if let Some(path) = &self.current_path {
+            ctx.copy_text(path.to_string_lossy().into_owned());
+        }
+    }
+
+    fn open_rename_dialog(&mut self) {
+        if let Some(name) = self
+            .current_path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+        {
+            self.rename_name = name.to_string();
+            self.rename_open = true;
+        }
+    }
+
+    fn rename_current_file(&mut self, ctx: &egui::Context) {
+        let Some(old_path) = self.current_path.clone() else {
+            return;
+        };
+        let new_name = self.rename_name.trim();
+        if new_name.is_empty() || new_name.contains('/') || new_name.contains('\\') {
+            self.error_message = Some("Invalid file name".to_string());
+            return;
+        }
+        let Some(parent) = old_path.parent() else {
+            self.error_message = Some("Cannot rename file".to_string());
+            return;
+        };
+        let new_path = parent.join(new_name);
+        if new_path == old_path {
+            self.rename_open = false;
+            return;
+        }
+        let old_ext = old_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+        let new_ext = new_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+        if !old_ext.eq_ignore_ascii_case(new_ext) {
+            self.error_message = Some("Keep the original file extension".to_string());
+            return;
+        }
+        if new_path.exists() {
+            self.error_message = Some("File already exists".to_string());
+            return;
+        }
+        if let Err(e) = std::fs::rename(&old_path, &new_path) {
+            self.error_message = Some(format!("Rename failed: {}", e));
+            return;
+        }
+        self.current_path = Some(new_path.clone());
+        self.navigator.scan_directory(&new_path);
+        self.rename_open = false;
+        self.error_message = None;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
+    }
+
+    fn rotate_current(&mut self, ctx: &egui::Context, clockwise: bool) {
+        if self.current_pixels.is_empty() {
+            return;
+        }
+        if !self.undo_stack.can_undo() {
+            self.undo_stack.push(Mutation {
+                pixels: self.current_pixels.clone(),
+                width: self.image_width,
+                height: self.image_height,
+                plugin_name: "core".to_string(),
+            });
+        }
+        self.animation = None;
+        let rotated = if clockwise {
+            rotate_rgba_cw(&self.current_pixels, self.image_width, self.image_height)
+        } else {
+            rotate_rgba_ccw(&self.current_pixels, self.image_width, self.image_height)
+        };
+        let Some((pixels, width, height)) = rotated else {
+            self.error_message = Some("Rotate failed".to_string());
+            return;
+        };
+
+        self.renderer.set_image(ctx, &pixels, width, height);
+        self.current_pixels = pixels;
+        self.image_width = width;
+        self.image_height = height;
+        self.undo_stack.push(Mutation {
+            pixels: self.current_pixels.clone(),
+            width: self.image_width,
+            height: self.image_height,
+            plugin_name: "core".to_string(),
+        });
+
+        let plugin_ctx = self.ctx_builder.build(
+            None,
+            self.current_path.as_deref(),
+            self.navigator.count() as u32,
+            self.navigator.current_index() as u32,
+            None,
+        );
+        self.plugin_manager
+            .broadcast_event("core:image_changed", &plugin_ctx);
     }
 
     /// Dispatch a plugin action by action_id (e.g. "rotate:cw").
@@ -693,6 +841,42 @@ impl NeoimvApp {
         });
     }
 
+    fn render_rename_dialog(&mut self, ctx: &egui::Context) {
+        if !self.rename_open {
+            return;
+        }
+
+        let mut rename = false;
+        let mut cancel = false;
+        egui::Window::new("Rename file")
+            .collapsible(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                let response = ui.text_edit_singleline(&mut self.rename_name);
+                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    rename = true;
+                }
+                ui.horizontal(|ui| {
+                    if ui.button("Rename").clicked() {
+                        rename = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                });
+                if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    cancel = true;
+                }
+            });
+
+        if rename {
+            self.rename_current_file(ctx);
+        }
+        if cancel {
+            self.rename_open = false;
+        }
+    }
+
     /// Detect viewport size changes and broadcast core:window_resized.
     fn check_viewport_resize(&mut self, ctx: &egui::Context) {
         let size = ctx.screen_rect().size();
@@ -730,6 +914,8 @@ impl eframe::App for NeoimvApp {
 
         // 6. Render plugin UIs (right side panel, only if plugins with UI are loaded)
         self.render_plugin_uis(ctx);
+
+        self.render_rename_dialog(ctx);
 
         // 7. Filmstrip (bottom panel, above statusbar)
         if self.config.core.filmstrip {

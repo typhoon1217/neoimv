@@ -20,10 +20,12 @@ impl KeymapConfig {
 
         match std::fs::read_to_string(path) {
             Ok(content) => {
-                toml::from_str(&content).unwrap_or_else(|e| {
+                let mut loaded = toml::from_str(&content).unwrap_or_else(|e| {
                     warn!("Failed to parse keymap.toml: {}, using defaults", e);
                     Self::defaults()
-                })
+                });
+                loaded.merge_missing_core_defaults();
+                loaded
             }
             Err(e) => {
                 warn!("Failed to read keymap.toml: {}, using defaults", e);
@@ -54,9 +56,22 @@ impl KeymapConfig {
         core.insert("F11".into(), "core:fullscreen".into());
         core.insert("Ctrl+z".into(), "core:undo".into());
         core.insert("Ctrl+Shift+z".into(), "core:redo".into());
+        core.insert("Ctrl+c".into(), "core:copy_image".into());
+        core.insert("Ctrl+Shift+c".into(), "core:copy_path".into());
+        core.insert("F2".into(), "core:rename_file".into());
+        core.insert("r".into(), "core:rotate_cw".into());
+        core.insert("Shift+r".into(), "core:rotate_ccw".into());
         core.insert("Ctrl+s".into(), "core:save".into());
 
         Self { core, plugin: HashMap::new() }
+    }
+
+    fn merge_missing_core_defaults(&mut self) {
+        for (key, action) in Self::defaults().core {
+            if !self.core.contains_key(&key) && !self.core.values().any(|a| a == &action) {
+                self.core.insert(key, action);
+            }
+        }
     }
 
     /// Look up action for a key string. Checks core first, then plugins.
@@ -148,10 +163,8 @@ mod tests {
     #[test]
     fn test_merge_plugin_defaults_no_conflict() {
         let mut km = KeymapConfig::defaults();
-        km.merge_plugin_defaults("rotate", &[
-            ("r".into(), "rotate:cw".into()),
-        ]);
-        assert_eq!(km.action_for_key("r"), Some("rotate:cw"));
+        km.merge_plugin_defaults("rotate", &[("Ctrl+r".into(), "rotate:cw".into())]);
+        assert_eq!(km.action_for_key("Ctrl+r"), Some("rotate:cw"));
     }
 
     #[test]
@@ -179,5 +192,14 @@ mod tests {
         let toml_str = toml::to_string_pretty(&km).unwrap();
         let loaded: KeymapConfig = toml::from_str(&toml_str).unwrap();
         assert_eq!(loaded.action_for_key("Left"), Some("core:prev_image"));
+    }
+
+    #[test]
+    fn test_merge_missing_core_defaults() {
+        let mut km = KeymapConfig::default();
+        km.core.insert("Left".into(), "core:prev_image".into());
+        km.merge_missing_core_defaults();
+        assert_eq!(km.action_for_key("Ctrl+c"), Some("core:copy_image"));
+        assert_eq!(km.action_for_key("r"), Some("core:rotate_cw"));
     }
 }

@@ -4,6 +4,7 @@ pub mod drag_drop;
 pub mod filmstrip;
 pub mod fonts;
 pub mod image_loader;
+pub mod image_ops;
 pub mod navigator;
 pub mod renderer;
 pub mod save;
