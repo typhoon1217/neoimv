@@ -127,7 +127,11 @@ fn props_str(ptr: &*const std::os::raw::c_char) -> Option<String> {
     let s = unsafe { CStr::from_ptr(*ptr) }
         .to_string_lossy()
         .into_owned();
-    if s.is_empty() { None } else { Some(s) }
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
 }
 
 /// Convert a label pointer to a `String`, returning an empty string on null.

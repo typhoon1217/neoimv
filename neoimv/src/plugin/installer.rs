@@ -97,8 +97,8 @@ pub fn install_from_github(
         .header("User-Agent", "neoimv")
         .send()?
         .text()?;
-    let manifest: PluginManifest = toml::from_str(&manifest_text)
-        .map_err(|e| InstallError::ManifestError(e.to_string()))?;
+    let manifest: PluginManifest =
+        toml::from_str(&manifest_text).map_err(|e| InstallError::ManifestError(e.to_string()))?;
 
     // 3. Check API version
     if manifest.api_version != supported_api_version {

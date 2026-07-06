@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 pub struct Mutation {
-    pub pixels: Vec<u8>,  // RGBA8, core-owned copy
+    pub pixels: Vec<u8>, // RGBA8, core-owned copy
     pub width: u32,
     pub height: u32,
     pub plugin_name: String,

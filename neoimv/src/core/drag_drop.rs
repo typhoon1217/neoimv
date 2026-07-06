@@ -1,7 +1,5 @@
 /// Supported image file extensions for drag-and-drop.
-pub const IMAGE_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif",
-];
+pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif"];
 
 /// Check whether the given extension (lowercase) is a supported image format.
 pub fn is_image_extension(ext: &str) -> bool {
@@ -10,9 +8,7 @@ pub fn is_image_extension(ext: &str) -> bool {
 
 /// Extract the first valid image path from a list of dropped egui files.
 /// Returns None if no valid image was found.
-pub fn first_image_from_dropped(
-    dropped: &[egui::DroppedFile],
-) -> Option<std::path::PathBuf> {
+pub fn first_image_from_dropped(dropped: &[egui::DroppedFile]) -> Option<std::path::PathBuf> {
     for file in dropped {
         if let Some(path) = &file.path {
             let ext = path

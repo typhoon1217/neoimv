@@ -15,7 +15,7 @@ pub enum PluginError {
     #[error("plugin panicked during {0}")]
     Panicked(String),
     #[error("plugin returned error: {0}")]
-    PluginError(String),
+    ReturnedError(String),
     #[error("incompatible API version: plugin={0}, supported={1:?}")]
     IncompatibleApi(u32, Vec<u32>),
 }
@@ -53,6 +53,11 @@ pub struct LoadedPlugin {
 impl LoadedPlugin {
     /// Load a plugin from a dynamic library path.
     /// Resolves all symbols, checks API version, calls plugin_init.
+    ///
+    /// # Safety
+    ///
+    /// The caller must only load trusted libraries that implement the neoimv plugin ABI.
+    /// The loaded library must remain valid for the lifetime of the returned `LoadedPlugin`.
     pub unsafe fn load(
         path: &std::path::Path,
         supported_api_versions: &[u32],
@@ -89,10 +94,16 @@ impl LoadedPlugin {
         let fn_actions = unsafe { lib.get(b"plugin_actions\0").ok().map(|s: Symbol<_>| *s) };
         let fn_on_action = unsafe { lib.get(b"plugin_on_action\0").ok().map(|s: Symbol<_>| *s) };
         let fn_render_ui = unsafe { lib.get(b"plugin_render_ui\0").ok().map(|s: Symbol<_>| *s) };
-        let fn_config_schema =
-            unsafe { lib.get(b"plugin_config_schema\0").ok().map(|s: Symbol<_>| *s) };
-        let fn_on_config_changed =
-            unsafe { lib.get(b"plugin_on_config_changed\0").ok().map(|s: Symbol<_>| *s) };
+        let fn_config_schema = unsafe {
+            lib.get(b"plugin_config_schema\0")
+                .ok()
+                .map(|s: Symbol<_>| *s)
+        };
+        let fn_on_config_changed = unsafe {
+            lib.get(b"plugin_on_config_changed\0")
+                .ok()
+                .map(|s: Symbol<_>| *s)
+        };
         let fn_on_event = unsafe { lib.get(b"plugin_on_event\0").ok().map(|s: Symbol<_>| *s) };
 
         Ok(Self {
@@ -148,7 +159,7 @@ impl LoadedPlugin {
                 } else {
                     "init failed".into()
                 };
-                return Err(PluginError::PluginError(msg));
+                return Err(PluginError::ReturnedError(msg));
             }
         }
         Ok(())
@@ -162,6 +173,7 @@ impl LoadedPlugin {
     }
 
     /// Call plugin_free to release plugin-allocated memory.
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn free_ptr(&self, ptr: *mut u8) {
         if let Some(f) = self.fn_free {
             if !ptr.is_null() {
@@ -208,15 +220,12 @@ impl LoadedPlugin {
     pub fn decode(&self, data: &[u8]) -> Option<MutatedImage> {
         let f = self.fn_decode?;
         match catch_unwind(AssertUnwindSafe(|| unsafe { f(data.as_ptr(), data.len()) })) {
-            Ok(result)
-                if result.result == PluginResultCode::Ok && !result.pixels.is_null() =>
-            {
+            Ok(result) if result.result == PluginResultCode::Ok && !result.pixels.is_null() => {
                 Some(result)
             }
             Ok(result) => {
                 if result.result == PluginResultCode::Error && !result.error_message.is_null() {
-                    let msg =
-                        unsafe { CStr::from_ptr(result.error_message) }.to_string_lossy();
+                    let msg = unsafe { CStr::from_ptr(result.error_message) }.to_string_lossy();
                     warn!("Plugin {} decode error: {}", self.name, msg);
                 }
                 None
@@ -280,19 +289,19 @@ impl LoadedPlugin {
     ) -> Option<(Vec<u8>, u32, u32)> {
         let f = self.fn_on_action?;
 
-        let result =
-            match catch_unwind(AssertUnwindSafe(|| unsafe { f(action_id.as_ptr(), ctx as *const _) })) {
-                Ok(r) => r,
-                Err(_) => {
-                    error!("Plugin {} panicked in plugin_on_action", self.name);
-                    return None;
-                }
-            };
+        let result = match catch_unwind(AssertUnwindSafe(|| unsafe {
+            f(action_id.as_ptr(), ctx as *const _)
+        })) {
+            Ok(r) => r,
+            Err(_) => {
+                error!("Plugin {} panicked in plugin_on_action", self.name);
+                return None;
+            }
+        };
 
         if result.result != PluginResultCode::Ok || result.pixels.is_null() {
             if result.result == PluginResultCode::Error && !result.error_message.is_null() {
-                let msg =
-                    unsafe { CStr::from_ptr(result.error_message) }.to_string_lossy();
+                let msg = unsafe { CStr::from_ptr(result.error_message) }.to_string_lossy();
                 warn!("Plugin {} action error: {}", self.name, msg);
             }
             return None;
@@ -322,13 +331,16 @@ impl LoadedPlugin {
     /// Send event notification.
     pub fn on_event(&self, event_id: &std::ffi::CString, ctx: &PluginContext) {
         let Some(f) = self.fn_on_event else { return };
-        let _ =
-            catch_unwind(AssertUnwindSafe(|| unsafe { f(event_id.as_ptr(), ctx as *const _) }));
+        let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
+            f(event_id.as_ptr(), ctx as *const _)
+        }));
     }
 
     /// Call plugin_on_config_changed with a JSON config string.
     pub fn on_config_changed(&self, config_json: &std::ffi::CString) {
-        let Some(f) = self.fn_on_config_changed else { return };
+        let Some(f) = self.fn_on_config_changed else {
+            return;
+        };
         let _ = catch_unwind(AssertUnwindSafe(|| unsafe { f(config_json.as_ptr()) }));
     }
 

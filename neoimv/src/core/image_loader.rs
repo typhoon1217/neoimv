@@ -17,7 +17,7 @@ pub enum LoadError {
 }
 
 pub struct DecodedImage {
-    pub pixels: Vec<u8>,   // RGBA8
+    pub pixels: Vec<u8>, // RGBA8
     pub width: u32,
     pub height: u32,
 }
@@ -59,11 +59,7 @@ pub fn load_image_animated(path: &Path) -> Result<LoadedImage, LoadError> {
                     .into_iter()
                     .map(|f| {
                         let (num, denom) = f.delay().numer_denom_ms();
-                        let delay_ms = if denom == 0 {
-                            100
-                        } else {
-                            (num / denom).max(10)
-                        };
+                        let delay_ms = num.checked_div(denom).unwrap_or(100).max(10);
                         let rgba = f.into_buffer();
                         let (width, height) = rgba.dimensions();
                         AnimationFrame {
@@ -96,11 +92,7 @@ pub fn load_image_animated(path: &Path) -> Result<LoadedImage, LoadError> {
                     .into_iter()
                     .map(|f| {
                         let (num, denom) = f.delay().numer_denom_ms();
-                        let delay_ms = if denom == 0 {
-                            100
-                        } else {
-                            (num / denom).max(10)
-                        };
+                        let delay_ms = num.checked_div(denom).unwrap_or(100).max(10);
                         let rgba = f.into_buffer();
                         let (width, height) = rgba.dimensions();
                         AnimationFrame {

@@ -136,10 +136,16 @@ pub struct UiNode {
 // Safety helpers for constructing PluginResult
 impl PluginResult {
     pub fn ok() -> Self {
-        Self { code: PluginResultCode::Ok, error_message: std::ptr::null() }
+        Self {
+            code: PluginResultCode::Ok,
+            error_message: std::ptr::null(),
+        }
     }
     pub fn error(msg: *const c_char) -> Self {
-        Self { code: PluginResultCode::Error, error_message: msg }
+        Self {
+            code: PluginResultCode::Error,
+            error_message: msg,
+        }
     }
 }
 

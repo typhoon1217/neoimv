@@ -5,7 +5,7 @@ pub struct StatusInfo<'a> {
     pub width: u32,
     pub height: u32,
     pub zoom_percent: f32,
-    pub image_index: usize,    // 0-based
+    pub image_index: usize, // 0-based
     pub image_count: usize,
 }
 

@@ -6,7 +6,7 @@ use tracing::{info, warn};
 pub struct PluginEntry {
     pub name: String,
     pub version: String,
-    pub source: String,       // GitHub repo URL
+    pub source: String, // GitHub repo URL
     pub enabled: bool,
     pub api_version: u32,
     pub lib_filename: String, // e.g. "libneoimv_rotate.so"
@@ -36,8 +36,7 @@ impl PluginRegistry {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let content = toml::to_string_pretty(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let content = toml::to_string_pretty(self).map_err(std::io::Error::other)?;
         std::fs::write(path, content)?;
         info!("Saved plugin registry to {}", path.display());
         Ok(())

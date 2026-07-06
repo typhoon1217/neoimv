@@ -1,4 +1,4 @@
-use egui::{ColorImage, TextureHandle, TextureOptions, Ui, Vec2, Rect, Pos2, Sense};
+use egui::{ColorImage, Pos2, Rect, Sense, TextureHandle, TextureOptions, Ui, Vec2};
 
 pub struct ImageRenderer {
     texture: Option<TextureHandle>,
@@ -27,10 +27,8 @@ impl ImageRenderer {
     }
 
     pub fn set_image(&mut self, ctx: &egui::Context, pixels: &[u8], width: u32, height: u32) {
-        let color_image = ColorImage::from_rgba_unmultiplied(
-            [width as usize, height as usize],
-            pixels,
-        );
+        let color_image =
+            ColorImage::from_rgba_unmultiplied([width as usize, height as usize], pixels);
         self.texture = Some(ctx.load_texture("current_image", color_image, TextureOptions::LINEAR));
         self.image_size = Vec2::new(width as f32, height as f32);
         self.zoom = 1.0;
@@ -103,10 +101,7 @@ impl ImageRenderer {
         // Center the image
         let offset = (available - display_size) * 0.5 + self.pan_offset;
 
-        let rect = Rect::from_min_size(
-            response.rect.min + offset,
-            display_size,
-        );
+        let rect = Rect::from_min_size(response.rect.min + offset, display_size);
 
         // Safe to unwrap: checked is_none() above
         let texture_id = self.texture.as_ref().unwrap().id();

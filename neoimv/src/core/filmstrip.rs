@@ -1,8 +1,8 @@
-use egui::{TextureHandle, ColorImage, TextureOptions, Ui, Vec2};
+use egui::{ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use sha2::{Sha256, Digest};
 
 const THUMB_SIZE: u32 = 128;
 
@@ -51,8 +51,7 @@ impl Filmstrip {
     ) -> Option<usize> {
         // Collect completed thumbnails from background thread
         while let Ok((path, pixels, w, h)) = self.result_rx.try_recv() {
-            let color_img =
-                ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &pixels);
+            let color_img = ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &pixels);
             let tex = ctx.load_texture(
                 path.to_string_lossy().into_owned(),
                 color_img,
@@ -70,17 +69,15 @@ impl Filmstrip {
             let start = current_index.saturating_sub(visible_count / 2);
             let end = (start + visible_count + 4).min(images.len());
 
-            for i in start..end {
-                let path = &images[i];
+            for (i, path) in images.iter().enumerate().take(end).skip(start) {
                 let is_current = i == current_index;
 
                 if let Some(tex) = self.thumbnails.get(path) {
                     let size = Vec2::new(80.0, 80.0);
-                    let resp = ui.add(
-                        egui::ImageButton::new(
-                            egui::load::SizedTexture::new(tex.id(), size),
-                        ),
-                    );
+                    let resp = ui.add(egui::ImageButton::new(egui::load::SizedTexture::new(
+                        tex.id(),
+                        size,
+                    )));
                     if is_current {
                         ui.painter().rect_stroke(
                             resp.rect,
@@ -132,10 +129,7 @@ impl Filmstrip {
     }
 }
 
-fn generate_thumbnail(
-    path: &Path,
-    size: u32,
-) -> Result<(Vec<u8>, u32, u32), image::ImageError> {
+fn generate_thumbnail(path: &Path, size: u32) -> Result<(Vec<u8>, u32, u32), image::ImageError> {
     let img = image::open(path)?;
     let thumb = img.thumbnail(size, size).to_rgba8();
     let (w, h) = thumb.dimensions();
@@ -148,15 +142,13 @@ fn save_thumbnail_cache(
     h: u32,
     path: &Path,
 ) -> Result<(), image::ImageError> {
-    let img = image::RgbaImage::from_raw(w, h, pixels.to_vec())
-        .expect("pixel buffer size mismatch");
+    let img =
+        image::RgbaImage::from_raw(w, h, pixels.to_vec()).expect("pixel buffer size mismatch");
     img.save(path)?;
     Ok(())
 }
 
-fn load_thumbnail_cache(
-    path: &Path,
-) -> Result<(Vec<u8>, u32, u32), image::ImageError> {
+fn load_thumbnail_cache(path: &Path) -> Result<(Vec<u8>, u32, u32), image::ImageError> {
     let img = image::open(path)?.to_rgba8();
     let (w, h) = img.dimensions();
     Ok((img.into_raw(), w, h))

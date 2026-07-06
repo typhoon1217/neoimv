@@ -10,7 +10,10 @@ use std::process::Command;
 /// Returns the workspace root (parent of the neoimv crate directory).
 fn workspace_root() -> PathBuf {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    manifest.parent().expect("neoimv crate has a parent").to_path_buf()
+    manifest
+        .parent()
+        .expect("neoimv crate has a parent")
+        .to_path_buf()
 }
 
 /// Builds the test plugin and returns the path to the compiled .so.
@@ -133,10 +136,7 @@ fn test_on_action_test_hello_returns_image() {
     let action_id = std::ffi::CString::new("test:hello").unwrap();
     let result = plugin.on_action(&action_id, &ctx);
 
-    assert!(
-        result.is_some(),
-        "test:hello action should return an image"
-    );
+    assert!(result.is_some(), "test:hello action should return an image");
     let (pixels, width, height) = result.unwrap();
     assert_eq!(width, 1, "expected 1px wide image");
     assert_eq!(height, 1, "expected 1px tall image");
@@ -154,7 +154,10 @@ fn test_on_action_unknown_action_returns_none() {
 
     let action_id = std::ffi::CString::new("test:nonexistent").unwrap();
     let result = plugin.on_action(&action_id, &ctx);
-    assert!(result.is_none(), "unknown action should return None, not crash");
+    assert!(
+        result.is_none(),
+        "unknown action should return None, not crash"
+    );
 }
 
 #[test]

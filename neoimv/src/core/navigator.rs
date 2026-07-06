@@ -1,9 +1,7 @@
-use std::path::{Path, PathBuf};
 use natord::compare as natural_compare;
+use std::path::{Path, PathBuf};
 
-const IMAGE_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif",
-];
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif"];
 
 pub struct Navigator {
     images: Vec<PathBuf>,
@@ -113,7 +111,13 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
 
         // Create test image files (empty files with image extensions)
-        for name in &["img_1.png", "img_2.jpg", "img_10.png", "img_3.gif", "readme.txt"] {
+        for name in &[
+            "img_1.png",
+            "img_2.jpg",
+            "img_10.png",
+            "img_3.gif",
+            "readme.txt",
+        ] {
             fs::write(dir.join(name), b"").unwrap();
         }
         dir
@@ -134,10 +138,15 @@ mod tests {
         let mut nav = Navigator::new();
         nav.scan_directory(&dir);
 
-        let names: Vec<&str> = nav.images.iter()
+        let names: Vec<&str> = nav
+            .images
+            .iter()
             .filter_map(|p| p.file_name()?.to_str())
             .collect();
-        assert_eq!(names, vec!["img_1.png", "img_2.jpg", "img_3.gif", "img_10.png"]);
+        assert_eq!(
+            names,
+            vec!["img_1.png", "img_2.jpg", "img_3.gif", "img_10.png"]
+        );
         fs::remove_dir_all(&dir).ok();
     }
 

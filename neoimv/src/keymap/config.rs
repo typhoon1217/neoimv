@@ -35,8 +35,7 @@ impl KeymapConfig {
     }
 
     pub fn save(&self, path: &Path) -> Result<(), std::io::Error> {
-        let content = toml::to_string_pretty(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let content = toml::to_string_pretty(self).map_err(std::io::Error::other)?;
 
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;

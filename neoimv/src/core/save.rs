@@ -1,4 +1,4 @@
-use image::{RgbaImage, ImageFormat};
+use image::{ImageFormat, RgbaImage};
 use std::path::Path;
 use thiserror::Error;
 
@@ -18,13 +18,16 @@ pub enum SaveError {
 
 /// Save RGBA pixel buffer to a file. Format is inferred from extension.
 pub fn save_image(pixels: &[u8], width: u32, height: u32, path: &Path) -> Result<(), SaveError> {
-    let img = RgbaImage::from_raw(width, height, pixels.to_vec())
-        .ok_or(SaveError::BufferError)?;
+    let img = RgbaImage::from_raw(width, height, pixels.to_vec()).ok_or(SaveError::BufferError)?;
 
-    let format = ImageFormat::from_path(path)
-        .map_err(|_| SaveError::UnsupportedFormat(
-            path.extension().unwrap_or_default().to_string_lossy().into()
-        ))?;
+    let format = ImageFormat::from_path(path).map_err(|_| {
+        SaveError::UnsupportedFormat(
+            path.extension()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into(),
+        )
+    })?;
 
     img.save_with_format(path, format)?;
     Ok(())
@@ -52,7 +55,9 @@ mod tests {
 
     #[test]
     fn test_save_png() {
-        let pixels = vec![255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255];
+        let pixels = vec![
+            255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+        ];
         let path = std::env::temp_dir().join("neoimv_save_test.png");
         save_image(&pixels, 2, 2, &path).unwrap();
         assert!(path.exists());

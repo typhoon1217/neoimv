@@ -1,6 +1,6 @@
-use egui::{Color32, RichText, Ui};
-use crate::keymap::config::KeymapConfig;
 use crate::keymap::action::ActionRegistry;
+use crate::keymap::config::KeymapConfig;
+use egui::{Color32, RichText, Ui};
 
 pub struct KeymapEditor {
     /// When Some(action_id), we are capturing next keypress for rebinding
@@ -10,11 +10,15 @@ pub struct KeymapEditor {
 
 impl KeymapEditor {
     pub fn new() -> Self {
-        Self { rebinding: None, filter_text: String::new() }
+        Self {
+            rebinding: None,
+            filter_text: String::new(),
+        }
     }
 
     pub fn render(
-        &mut self, ui: &mut Ui,
+        &mut self,
+        ui: &mut Ui,
         keymap: &mut KeymapConfig,
         registry: &ActionRegistry,
     ) -> bool {
@@ -39,7 +43,13 @@ impl KeymapEditor {
             );
             let events = ui.input(|i| i.events.clone());
             for event in &events {
-                if let egui::Event::Key { key, pressed: true, modifiers, .. } = event {
+                if let egui::Event::Key {
+                    key,
+                    pressed: true,
+                    modifiers,
+                    ..
+                } = event
+                {
                     if *key == egui::Key::Escape {
                         self.rebinding = None;
                     } else {
@@ -63,12 +73,17 @@ impl KeymapEditor {
         // Group actions by category (plugin name or "core")
         let filter_lower = self.filter_text.to_lowercase();
         for (category, actions) in registry.grouped_actions() {
-            let visible: Vec<_> = actions.iter()
-                .filter(|a| filter_lower.is_empty()
-                    || a.label.to_lowercase().contains(&filter_lower)
-                    || a.id.to_lowercase().contains(&filter_lower))
+            let visible: Vec<_> = actions
+                .iter()
+                .filter(|a| {
+                    filter_lower.is_empty()
+                        || a.label.to_lowercase().contains(&filter_lower)
+                        || a.id.to_lowercase().contains(&filter_lower)
+                })
                 .collect();
-            if visible.is_empty() { continue; }
+            if visible.is_empty() {
+                continue;
+            }
 
             egui::CollapsingHeader::new(&category)
                 .default_open(true)
@@ -83,7 +98,8 @@ impl KeymapEditor {
 
                             for action in visible {
                                 ui.label(&action.label);
-                                let current_key = keymap.key_for_action(&action.id)
+                                let current_key = keymap
+                                    .key_for_action(&action.id)
                                     .unwrap_or_else(|| "unbound".into());
                                 ui.label(&current_key);
                                 if ui.button("Rebind").clicked() {
@@ -100,9 +116,15 @@ impl KeymapEditor {
 
 fn format_key_combo(mods: egui::Modifiers, key: egui::Key) -> String {
     let mut parts: Vec<String> = Vec::new();
-    if mods.ctrl { parts.push("Ctrl".into()); }
-    if mods.alt { parts.push("Alt".into()); }
-    if mods.shift { parts.push("Shift".into()); }
+    if mods.ctrl {
+        parts.push("Ctrl".into());
+    }
+    if mods.alt {
+        parts.push("Alt".into());
+    }
+    if mods.shift {
+        parts.push("Shift".into());
+    }
     parts.push(key_name(key));
     parts.join("+")
 }

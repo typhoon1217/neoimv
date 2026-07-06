@@ -28,7 +28,7 @@ impl Capabilities {
 
 /// Rust-friendly image for plugin returns
 pub struct Image {
-    pub pixels: Vec<u8>,  // RGBA8
+    pub pixels: Vec<u8>, // RGBA8
     pub width: u32,
     pub height: u32,
 }

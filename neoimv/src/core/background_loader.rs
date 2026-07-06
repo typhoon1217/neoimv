@@ -1,7 +1,7 @@
+use neoimv_plugin_sdk::*;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
-use neoimv_plugin_sdk::*;
 
 pub enum LoadRequest {
     Load(PathBuf),
@@ -70,7 +70,8 @@ impl BackgroundLoader {
                                         }),
                                     );
                                     if let Ok(mi) = result {
-                                        if mi.result == PluginResultCode::Ok && !mi.pixels.is_null() {
+                                        if mi.result == PluginResultCode::Ok && !mi.pixels.is_null()
+                                        {
                                             let size = (mi.width * mi.height * 4) as usize;
                                             let pixels = unsafe {
                                                 std::slice::from_raw_parts(mi.pixels, size)

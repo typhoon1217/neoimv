@@ -179,10 +179,7 @@ fn render_plugin_config(
     };
 
     // Get or create plugin config section
-    let plugin_conf = config
-        .plugin
-        .entry(plugin_name.to_string())
-        .or_insert_with(toml::Table::new);
+    let plugin_conf = config.plugin.entry(plugin_name.to_string()).or_default();
 
     for field in &schema {
         match field.field_type {

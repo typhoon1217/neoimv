@@ -21,7 +21,10 @@ impl PluginManager {
     /// Load all plugins from the plugin directory.
     pub fn load_all(&mut self) {
         if !self.plugin_dir.exists() {
-            info!("Plugin directory does not exist: {}", self.plugin_dir.display());
+            info!(
+                "Plugin directory does not exist: {}",
+                self.plugin_dir.display()
+            );
             return;
         }
 

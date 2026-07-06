@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tracing::{error, info, warn};
 
@@ -189,7 +189,7 @@ impl NeoimvApp {
     }
 
     /// Request a background load with animated detection.
-    fn load_image_animated(&mut self, path: &PathBuf) {
+    fn load_image_animated(&mut self, path: &Path) {
         info!("Requesting animated load: {}", path.display());
         self.loading = true;
         self.error_message = None;
@@ -212,7 +212,7 @@ impl NeoimvApp {
                         self.image_height = first.height;
                     }
                     self.animation = Some(AnimationState::new(frames));
-                    self.current_path = Some(path.clone());
+                    self.current_path = Some(path.to_path_buf());
                     self.error_message = None;
                     self.loading = false;
                     return;
@@ -222,7 +222,7 @@ impl NeoimvApp {
                     self.image_width = decoded.width;
                     self.image_height = decoded.height;
                     self.animation = None;
-                    self.current_path = Some(path.clone());
+                    self.current_path = Some(path.to_path_buf());
                     self.error_message = None;
                     self.loading = false;
                     return;
@@ -236,7 +236,7 @@ impl NeoimvApp {
         }
 
         // Non-animated: use background loader
-        self.loader.request_load(path.clone());
+        self.loader.request_load(path.to_path_buf());
     }
 
     fn window_title(&self) -> String {

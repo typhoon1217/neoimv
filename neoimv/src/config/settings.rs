@@ -34,14 +34,30 @@ pub struct CoreConfig {
     pub font_override: String,
 }
 
-fn default_theme() -> String { "dark".into() }
-fn default_fit() -> String { "fit_window".into() }
-fn default_true() -> bool { true }
-fn default_filmstrip_position() -> String { "bottom".into() }
-fn default_filmstrip_height() -> u32 { 80 }
-fn default_font() -> String { "system".into() }
-fn default_undo_depth() -> usize { 50 }
-fn default_undo_memory() -> usize { 512 }
+fn default_theme() -> String {
+    "dark".into()
+}
+fn default_fit() -> String {
+    "fit_window".into()
+}
+fn default_true() -> bool {
+    true
+}
+fn default_filmstrip_position() -> String {
+    "bottom".into()
+}
+fn default_filmstrip_height() -> u32 {
+    80
+}
+fn default_font() -> String {
+    "system".into()
+}
+fn default_undo_depth() -> usize {
+    50
+}
+fn default_undo_memory() -> usize {
+    512
+}
 
 impl Default for CoreConfig {
     fn default() -> Self {
@@ -90,8 +106,7 @@ impl AppConfig {
     }
 
     pub fn save(&self, path: &Path) -> Result<(), std::io::Error> {
-        let content = toml::to_string_pretty(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let content = toml::to_string_pretty(self).map_err(std::io::Error::other)?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -99,7 +114,8 @@ impl AppConfig {
     }
 
     pub fn plugin_config_toml(&self, plugin_name: &str) -> Option<String> {
-        self.plugin.get(plugin_name)
+        self.plugin
+            .get(plugin_name)
             .and_then(|t| toml::to_string(t).ok())
     }
 }

@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::plugin::{installer, registry::PluginRegistry};
 
@@ -21,7 +21,7 @@ pub enum PluginCommand {
 
 pub fn handle_plugin_command(
     cmd: &PluginCommand,
-    config_dir: &PathBuf,
+    config_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let registry_path = config_dir.join("plugins").join("registry.toml");
     let plugins_dir = config_dir.join("plugins");

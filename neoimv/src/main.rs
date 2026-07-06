@@ -33,8 +33,7 @@ struct Cli {
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_env("NEOIMV_LOG")
-                .unwrap_or_else(|_| EnvFilter::new("warn")),
+            EnvFilter::try_from_env("NEOIMV_LOG").unwrap_or_else(|_| EnvFilter::new("warn")),
         )
         .init();
 
