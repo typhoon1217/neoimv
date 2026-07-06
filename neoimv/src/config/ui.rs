@@ -1,9 +1,9 @@
-use egui::Ui;
 use crate::config::settings::{AppConfig, CoreConfig};
-use crate::keymap::ui::KeymapEditor;
-use crate::keymap::config::KeymapConfig;
 use crate::keymap::action::ActionRegistry;
+use crate::keymap::config::KeymapConfig;
+use crate::keymap::ui::KeymapEditor;
 use crate::plugin::manager::PluginManager;
+use egui::Ui;
 use neoimv_plugin_sdk::ConfigFieldType;
 
 pub struct SettingsPanel {
@@ -33,6 +33,10 @@ impl SettingsPanel {
         self.open = !self.open;
     }
 
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
     pub fn render(
         &mut self,
         ctx: &egui::Context,
@@ -58,11 +62,7 @@ impl SettingsPanel {
                         SettingsTab::Keybindings,
                         "Keybindings",
                     );
-                    ui.selectable_value(
-                        &mut self.active_tab,
-                        SettingsTab::Plugins,
-                        "Plugins",
-                    );
+                    ui.selectable_value(&mut self.active_tab, SettingsTab::Plugins, "Plugins");
                     // Per-plugin config tabs
                     for name in plugin_manager.plugin_names() {
                         let tab = SettingsTab::PluginConfig(name.clone());
@@ -97,11 +97,17 @@ fn render_core_settings(ui: &mut Ui, core: &mut CoreConfig) -> bool {
     if ui.checkbox(&mut core.filmstrip, "Show filmstrip").changed() {
         changed = true;
     }
-    if ui.checkbox(&mut core.statusbar, "Show status bar").changed() {
+    if ui
+        .checkbox(&mut core.statusbar, "Show status bar")
+        .changed()
+    {
         changed = true;
     }
     if ui
-        .checkbox(&mut core.window_remember_position, "Remember window position")
+        .checkbox(
+            &mut core.window_remember_position,
+            "Remember window position",
+        )
         .changed()
     {
         changed = true;
@@ -149,8 +155,7 @@ fn render_core_settings(ui: &mut Ui, core: &mut CoreConfig) -> bool {
     }
     if ui
         .add(
-            egui::Slider::new(&mut core.undo_memory_cap_mb, 64..=2048)
-                .text("Undo memory cap (MB)"),
+            egui::Slider::new(&mut core.undo_memory_cap_mb, 64..=2048).text("Undo memory cap (MB)"),
         )
         .changed()
     {

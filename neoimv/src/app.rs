@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 use tracing::{error, info, warn};
 
-use crate::config::settings::{AppConfig, cache_dir, config_dir};
+use crate::config::settings::{cache_dir, config_dir, AppConfig};
+use crate::config::ui::SettingsPanel;
 use crate::core::animation::AnimationState;
 use crate::core::background_loader::{BackgroundLoader, LoadResult, PluginDecoder};
 use crate::core::filmstrip::Filmstrip;
@@ -68,6 +69,7 @@ pub struct NeoimvApp {
     // Keymap + actions
     keymap: KeymapConfig,
     action_registry: ActionRegistry,
+    settings_panel: SettingsPanel,
 
     // Plugin manager
     plugin_manager: PluginManager,
@@ -127,10 +129,7 @@ impl NeoimvApp {
         let loader = BackgroundLoader::new(decoders, ext_map);
 
         // Undo stack
-        let undo_stack = UndoStack::new(
-            config.core.undo_max_depth,
-            config.core.undo_memory_cap_mb,
-        );
+        let undo_stack = UndoStack::new(config.core.undo_max_depth, config.core.undo_memory_cap_mb);
 
         // Filmstrip
         let thumb_cache_dir = cch_dir.join("thumbnails");
@@ -162,6 +161,7 @@ impl NeoimvApp {
             last_viewport_size: egui::Vec2::ZERO,
             keymap,
             action_registry,
+            settings_panel: SettingsPanel::new(),
             plugin_manager,
             ctx_builder: ContextBuilder::new(),
         };
@@ -307,7 +307,7 @@ impl NeoimvApp {
 
     /// Process all key events this frame and dispatch actions.
     fn handle_input(&mut self, ctx: &egui::Context) {
-        if self.rename_open || ctx.wants_keyboard_input() {
+        if self.rename_open || self.settings_panel.is_open() || ctx.wants_keyboard_input() {
             return;
         }
 
@@ -431,9 +431,13 @@ impl NeoimvApp {
                 self.rotate_current(ctx, false);
             }
             "core:save" => {
-                if let (Some(path), pixels) = (&self.current_path.clone(), &self.current_pixels.clone()) {
+                if let (Some(path), pixels) =
+                    (&self.current_path.clone(), &self.current_pixels.clone())
+                {
                     if !pixels.is_empty() {
-                        if let Err(e) = save_image(pixels, self.image_width, self.image_height, path) {
+                        if let Err(e) =
+                            save_image(pixels, self.image_width, self.image_height, path)
+                        {
                             error!("Save failed: {}", e);
                             self.error_message = Some(format!("Save failed: {}", e));
                         }
@@ -462,7 +466,11 @@ impl NeoimvApp {
     }
 
     fn copy_current_image(&self, ctx: &egui::Context) {
-        if let Some(frame) = self.animation.as_ref().and_then(|anim| anim.current_frame()) {
+        if let Some(frame) = self
+            .animation
+            .as_ref()
+            .and_then(|anim| anim.current_frame())
+        {
             ctx.copy_image(egui::ColorImage::from_rgba_unmultiplied(
                 [frame.width as usize, frame.height as usize],
                 &frame.pixels,
@@ -517,8 +525,14 @@ impl NeoimvApp {
             self.rename_open = false;
             return;
         }
-        let old_ext = old_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-        let new_ext = new_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+        let old_ext = old_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("");
+        let new_ext = new_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("");
         if !old_ext.eq_ignore_ascii_case(new_ext) {
             self.error_message = Some("Keep the original file extension".to_string());
             return;
@@ -636,8 +650,7 @@ impl NeoimvApp {
                     });
                 }
 
-                self.renderer
-                    .set_image(egui_ctx, &pixels, width, height);
+                self.renderer.set_image(egui_ctx, &pixels, width, height);
                 self.current_pixels = pixels;
                 self.image_width = width;
                 self.image_height = height;
@@ -722,7 +735,12 @@ impl NeoimvApp {
                 }
             }
             ctx.request_repaint();
-        } else if self.animation.as_ref().map(|a| a.is_playing()).unwrap_or(false) {
+        } else if self
+            .animation
+            .as_ref()
+            .map(|a| a.is_playing())
+            .unwrap_or(false)
+        {
             // Keep repainting while animation is running
             ctx.request_repaint();
         }
@@ -743,14 +761,11 @@ impl NeoimvApp {
             return;
         }
 
-        let config_str = self
-            .current_path
-            .as_ref()
-            .and_then(|p| {
-                let name = p.file_name()?.to_str()?;
-                // Use first plugin name as key — each plugin gets its own config
-                Some(name.to_string())
-            });
+        let config_str = self.current_path.as_ref().and_then(|p| {
+            let name = p.file_name()?.to_str()?;
+            // Use first plugin name as key — each plugin gets its own config
+            Some(name.to_string())
+        });
         let _ = config_str; // suppress unused warning
 
         egui::SidePanel::right("plugin_ui_panel").show(ctx, |ui| {
@@ -791,7 +806,8 @@ impl NeoimvApp {
                             // that borrows ctx. Store it and dispatch after.
                             // For simplicity, dispatch plugin action directly.
                             let c_action = CString::new(action_id_owned.as_str()).unwrap();
-                            let image_buf2: Option<ImageBuffer> = if !self.current_pixels.is_empty() {
+                            let image_buf2: Option<ImageBuffer> = if !self.current_pixels.is_empty()
+                            {
                                 Some(ImageBuffer {
                                     pixels: self.current_pixels.as_ptr(),
                                     width: self.image_width,
@@ -877,6 +893,102 @@ impl NeoimvApp {
         }
     }
 
+    fn render_toolbar(&mut self, ctx: &egui::Context) {
+        let mut action: Option<&'static str> = None;
+        let has_image = !self.current_pixels.is_empty();
+        let has_path = self.current_path.is_some();
+
+        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                if ui.button("Prev").clicked() {
+                    action = Some("core:prev_image");
+                }
+                if ui.button("Next").clicked() {
+                    action = Some("core:next_image");
+                }
+                ui.separator();
+                if ui.button("Zoom -").clicked() {
+                    action = Some("core:zoom_out");
+                }
+                if ui.button("Zoom +").clicked() {
+                    action = Some("core:zoom_in");
+                }
+                if ui.button("Fit").clicked() {
+                    action = Some("core:fit_window");
+                }
+                if ui.button("Width").clicked() {
+                    action = Some("core:fit_width");
+                }
+                if ui.button("1:1").clicked() {
+                    action = Some("core:actual_size");
+                }
+                ui.separator();
+                if ui
+                    .add_enabled(has_image, egui::Button::new("Undo"))
+                    .clicked()
+                {
+                    action = Some("core:undo");
+                }
+                if ui
+                    .add_enabled(has_image, egui::Button::new("Redo"))
+                    .clicked()
+                {
+                    action = Some("core:redo");
+                }
+                if ui
+                    .add_enabled(has_image, egui::Button::new("Copy"))
+                    .clicked()
+                {
+                    action = Some("core:copy_image");
+                }
+                if ui
+                    .add_enabled(has_path, egui::Button::new("Path"))
+                    .clicked()
+                {
+                    action = Some("core:copy_path");
+                }
+                if ui
+                    .add_enabled(has_path, egui::Button::new("Rename"))
+                    .clicked()
+                {
+                    action = Some("core:rename_file");
+                }
+                if ui
+                    .add_enabled(has_image, egui::Button::new("Rot L"))
+                    .clicked()
+                {
+                    action = Some("core:rotate_ccw");
+                }
+                if ui
+                    .add_enabled(has_image, egui::Button::new("Rot R"))
+                    .clicked()
+                {
+                    action = Some("core:rotate_cw");
+                }
+                if ui
+                    .add_enabled(has_image && has_path, egui::Button::new("Save"))
+                    .clicked()
+                {
+                    action = Some("core:save");
+                }
+                if ui
+                    .add_enabled(has_image, egui::Button::new("Save As"))
+                    .clicked()
+                {
+                    action = Some("core:save_as");
+                }
+                ui.separator();
+                if ui.button("Settings").clicked() {
+                    self.settings_panel.toggle();
+                }
+            });
+        });
+
+        if let Some(action) = action {
+            self.dispatch_action(ctx, action);
+        }
+    }
+
     /// Detect viewport size changes and broadcast core:window_resized.
     fn check_viewport_resize(&mut self, ctx: &egui::Context) {
         let size = ctx.screen_rect().size();
@@ -912,12 +1024,30 @@ impl eframe::App for NeoimvApp {
         // 5. Detect viewport resize
         self.check_viewport_resize(ctx);
 
-        // 6. Render plugin UIs (right side panel, only if plugins with UI are loaded)
+        // 6. Toolbar and settings/keymap window
+        self.render_toolbar(ctx);
+        if self.settings_panel.render(
+            ctx,
+            &mut self.config,
+            &mut self.keymap,
+            &self.action_registry,
+            &self.plugin_manager,
+        ) {
+            let cfg_dir = config_dir();
+            if let Err(e) = self.config.save(&cfg_dir.join("config.toml")) {
+                self.error_message = Some(format!("Config save failed: {}", e));
+            }
+            if let Err(e) = self.keymap.save(&cfg_dir.join("keymap.toml")) {
+                self.error_message = Some(format!("Keymap save failed: {}", e));
+            }
+        }
+
+        // 7. Render plugin UIs (right side panel, only if plugins with UI are loaded)
         self.render_plugin_uis(ctx);
 
         self.render_rename_dialog(ctx);
 
-        // 7. Filmstrip (bottom panel, above statusbar)
+        // 8. Filmstrip (bottom panel, above statusbar)
         if self.config.core.filmstrip {
             let images: Vec<PathBuf> = self.navigator.images().to_vec();
             let current_index = self.navigator.current_index();
@@ -934,7 +1064,7 @@ impl eframe::App for NeoimvApp {
             }
         }
 
-        // 8. Status bar
+        // 9. Status bar
         if self.config.core.statusbar {
             let filename = self
                 .current_path
@@ -960,7 +1090,7 @@ impl eframe::App for NeoimvApp {
             });
         }
 
-        // 9. Central panel — image or loading/error state
+        // 10. Central panel — image or loading/error state
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.loading {
                 ui.centered_and_justified(|ui| {

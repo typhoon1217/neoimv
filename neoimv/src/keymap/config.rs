@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -62,8 +62,12 @@ impl KeymapConfig {
         core.insert("r".into(), "core:rotate_cw".into());
         core.insert("Shift+r".into(), "core:rotate_ccw".into());
         core.insert("Ctrl+s".into(), "core:save".into());
+        core.insert("Ctrl+Shift+s".into(), "core:save_as".into());
 
-        Self { core, plugin: HashMap::new() }
+        Self {
+            core,
+            plugin: HashMap::new(),
+        }
     }
 
     fn merge_missing_core_defaults(&mut self) {
@@ -89,7 +93,9 @@ impl KeymapConfig {
 
     /// Merge plugin default keybindings (doesn't overwrite existing user bindings)
     pub fn merge_plugin_defaults(&mut self, plugin_name: &str, defaults: &[(String, String)]) {
-        let all_bound_keys: Vec<String> = self.core.keys()
+        let all_bound_keys: Vec<String> = self
+            .core
+            .keys()
             .chain(self.plugin.values().flat_map(|m| m.keys()))
             .cloned()
             .collect();
@@ -100,7 +106,10 @@ impl KeymapConfig {
             if !all_bound_keys.contains(key) && !existing.values().any(|a| a == action) {
                 existing.insert(key.clone(), action.clone());
             } else if !existing.values().any(|a| a == action) {
-                warn!("Key '{}' already bound, skipping default for {}", key, action);
+                warn!(
+                    "Key '{}' already bound, skipping default for {}",
+                    key, action
+                );
             }
         }
     }
@@ -117,7 +126,9 @@ impl KeymapConfig {
         if action.starts_with("core:") {
             self.core.insert(key, action.to_string());
         } else if let Some(plugin_name) = action.split(':').next() {
-            self.plugin.entry(plugin_name.to_string()).or_default()
+            self.plugin
+                .entry(plugin_name.to_string())
+                .or_default()
                 .insert(key, action.to_string());
         }
     }
@@ -138,11 +149,15 @@ impl KeymapConfig {
     /// Reverse lookup: find the key bound to an action. Returns first match.
     pub fn key_for_action(&self, action: &str) -> Option<String> {
         for (key, act) in &self.core {
-            if act == action { return Some(key.clone()); }
+            if act == action {
+                return Some(key.clone());
+            }
         }
         for plugin_keys in self.plugin.values() {
             for (key, act) in plugin_keys {
-                if act == action { return Some(key.clone()); }
+                if act == action {
+                    return Some(key.clone());
+                }
             }
         }
         None
@@ -171,9 +186,7 @@ mod tests {
     fn test_merge_plugin_defaults_conflict_skipped() {
         let mut km = KeymapConfig::defaults();
         // "Left" is already bound to core:prev_image
-        km.merge_plugin_defaults("rotate", &[
-            ("Left".into(), "rotate:cw".into()),
-        ]);
+        km.merge_plugin_defaults("rotate", &[("Left".into(), "rotate:cw".into())]);
         // Should NOT overwrite
         assert_eq!(km.action_for_key("Left"), Some("core:prev_image"));
     }
