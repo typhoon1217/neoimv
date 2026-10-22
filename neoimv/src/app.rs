@@ -13,6 +13,7 @@ use crate::core::fonts;
 use crate::core::image_loader::{load_image_animated, LoadedImage};
 use crate::core::image_ops::{rotate_rgba_ccw, rotate_rgba_cw};
 use crate::core::navigator::Navigator;
+use crate::core::path_picker::{OpenRequest, PathPicker};
 use crate::core::renderer::{FitMode, ImageRenderer};
 use crate::core::save::{save_as_dialog, save_image};
 use crate::core::statusbar::{render_statusbar, StatusInfo};
@@ -56,6 +57,9 @@ pub struct NeoimvApp {
     // Rename dialog
     rename_open: bool,
     rename_name: String,
+
+    // Open-path picker
+    path_picker: PathPicker,
 
     // Filmstrip
     filmstrip: Filmstrip,
@@ -154,6 +158,7 @@ impl NeoimvApp {
             current_pixels: Vec::new(),
             rename_open: false,
             rename_name: String::new(),
+            path_picker: PathPicker::new(),
             filmstrip,
             window_state,
             window_state_path,
@@ -258,7 +263,10 @@ impl NeoimvApp {
                     format!("{} - neoimv", filename)
                 }
             }
-            None => "neoimv".to_string(),
+            None => match self.navigator.location() {
+                Some(dir) => format!("{} - neoimv", dir.display()),
+                None => "neoimv".to_string(),
+            },
         }
     }
 
@@ -307,7 +315,11 @@ impl NeoimvApp {
 
     /// Process all key events this frame and dispatch actions.
     fn handle_input(&mut self, ctx: &egui::Context) {
-        if self.rename_open || self.settings_panel.is_open() || ctx.wants_keyboard_input() {
+        if self.rename_open
+            || self.path_picker.is_open()
+            || self.settings_panel.is_open()
+            || ctx.wants_keyboard_input()
+        {
             return;
         }
 
@@ -421,6 +433,9 @@ impl NeoimvApp {
             "core:copy_path" => {
                 self.copy_current_path(ctx);
             }
+            "core:open_path" => {
+                self.open_path_picker();
+            }
             "core:rename_file" => {
                 self.open_rename_dialog();
             }
@@ -495,6 +510,56 @@ impl NeoimvApp {
         }
     }
 
+    /// Prefill with the active filter, else the current location (even an empty folder).
+    fn open_path_picker(&mut self) {
+        let base_dir = self
+            .navigator
+            .location()
+            .map(Path::to_path_buf)
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_default();
+        let input = match self.navigator.scope() {
+            Some(scope) => scope.to_string(),
+            None => {
+                let mut dir = base_dir.to_string_lossy().into_owned();
+                if !dir.ends_with(std::path::MAIN_SEPARATOR) {
+                    dir.push(std::path::MAIN_SEPARATOR);
+                }
+                dir
+            }
+        };
+        self.path_picker.open(input, base_dir);
+    }
+
+    fn open_request(&mut self, ctx: &egui::Context, request: OpenRequest) {
+        match request {
+            OpenRequest::Path(path) => {
+                self.navigator.scan_directory(&path);
+                if self.navigator.count() == 0 {
+                    // Stay in the folder anyway so the next Ctrl+O starts from it.
+                    self.renderer.clear();
+                    self.animation = None;
+                    self.current_path = None;
+                    self.current_pixels.clear();
+                    self.image_width = 0;
+                    self.image_height = 0;
+                    self.error_message = None;
+                    self.loading = false;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
+                    return;
+                }
+            }
+            OpenRequest::Scoped {
+                images,
+                index,
+                label,
+            } => self.navigator.set_scoped(images, index, label),
+        }
+        if let Some(path) = self.navigator.current().cloned() {
+            self.load_image_animated(&path);
+        }
+    }
+
     fn open_rename_dialog(&mut self) {
         if let Some(name) = self
             .current_path
@@ -546,7 +611,11 @@ impl NeoimvApp {
             return;
         }
         self.current_path = Some(new_path.clone());
-        self.navigator.scan_directory(&new_path);
+        if self.navigator.scope().is_some() {
+            self.navigator.replace_current(new_path);
+        } else {
+            self.navigator.scan_directory(&new_path);
+        }
         self.rename_open = false;
         self.error_message = None;
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
@@ -900,6 +969,10 @@ impl NeoimvApp {
 
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
+                if ui.button("Open").clicked() {
+                    action = Some("core:open_path");
+                }
+                ui.separator();
                 if ui.button("Prev").clicked() {
                     action = Some("core:prev_image");
                 }
@@ -1046,6 +1119,9 @@ impl eframe::App for NeoimvApp {
         self.render_plugin_uis(ctx);
 
         self.render_rename_dialog(ctx);
+        if let Some(request) = self.path_picker.render(ctx) {
+            self.open_request(ctx, request);
+        }
 
         // 8. Filmstrip (bottom panel, above statusbar)
         if self.config.core.filmstrip {
@@ -1085,6 +1161,7 @@ impl eframe::App for NeoimvApp {
                     zoom_percent: zoom,
                     image_index: index,
                     image_count: total,
+                    scope: self.navigator.scope(),
                 };
                 render_statusbar(ui, &info);
             });
@@ -1100,6 +1177,15 @@ impl eframe::App for NeoimvApp {
                 ui.centered_and_justified(|ui| {
                     ui.colored_label(egui::Color32::RED, err);
                 });
+            } else if self.navigator.count() == 0 && self.current_pixels.is_empty() {
+                if let Some(dir) = self.navigator.location() {
+                    ui.centered_and_justified(|ui| {
+                        ui.weak(format!(
+                            "No images in {}\nCtrl+O to open another path",
+                            dir.display()
+                        ));
+                    });
+                }
             } else {
                 // Set texture from current frame if animated (renderer already updated by tick)
                 // For static images renderer was already set during load

@@ -58,6 +58,7 @@ impl KeymapConfig {
         core.insert("Ctrl+c".into(), "core:copy_image".into());
         core.insert("Ctrl+Shift+c".into(), "core:copy_path".into());
         core.insert("F2".into(), "core:rename_file".into());
+        core.insert("Ctrl+o".into(), "core:open_path".into());
         core.insert("r".into(), "core:rotate_cw".into());
         core.insert("Shift+r".into(), "core:rotate_ccw".into());
         core.insert("Ctrl+s".into(), "core:save".into());

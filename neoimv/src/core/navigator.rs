@@ -6,6 +6,10 @@ const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", 
 pub struct Navigator {
     images: Vec<PathBuf>,
     index: usize,
+    /// Search text that narrowed `images`; `None` when browsing a whole directory.
+    scope: Option<String>,
+    /// Folder last opened, kept even when it holds no images.
+    location: Option<PathBuf>,
 }
 
 impl Navigator {
@@ -13,6 +17,8 @@ impl Navigator {
         Self {
             images: Vec::new(),
             index: 0,
+            scope: None,
+            location: None,
         }
     }
 
@@ -44,6 +50,8 @@ impl Navigator {
         });
 
         self.images = files;
+        self.scope = None;
+        self.location = Some(dir.to_path_buf());
 
         // If opened with a specific file, set index to that file
         if path.is_file() {
@@ -55,6 +63,10 @@ impl Navigator {
 
     pub fn current(&self) -> Option<&PathBuf> {
         self.images.get(self.index)
+    }
+
+    pub fn location(&self) -> Option<&Path> {
+        self.location.as_deref()
     }
 
     pub fn next(&mut self) -> Option<&PathBuf> {
@@ -97,6 +109,24 @@ impl Navigator {
         }
         self.index = index.min(self.images.len() - 1);
         self.current()
+    }
+
+    /// Navigate only within `images` (already in display order), labelled by `scope`.
+    pub fn set_scoped(&mut self, images: Vec<PathBuf>, index: usize, scope: String) {
+        self.index = index.min(images.len().saturating_sub(1));
+        self.images = images;
+        self.scope = Some(scope);
+    }
+
+    pub fn scope(&self) -> Option<&str> {
+        self.scope.as_deref()
+    }
+
+    /// Swap the current entry's path in place (after a rename), keeping order and scope.
+    pub fn replace_current(&mut self, path: PathBuf) {
+        if let Some(slot) = self.images.get_mut(self.index) {
+            *slot = path;
+        }
     }
 }
 

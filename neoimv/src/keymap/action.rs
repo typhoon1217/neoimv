@@ -36,6 +36,7 @@ impl ActionRegistry {
             ("core:redo", "Redo", "Edit"),
             ("core:copy_image", "Copy Image", "Edit"),
             ("core:copy_path", "Copy File Path", "Edit"),
+            ("core:open_path", "Open Path", "File"),
             ("core:rename_file", "Rename File", "File"),
             ("core:rotate_cw", "Rotate Clockwise", "Transform"),
             ("core:rotate_ccw", "Rotate Counterclockwise", "Transform"),

@@ -6,6 +6,7 @@ pub mod fonts;
 pub mod image_loader;
 pub mod image_ops;
 pub mod navigator;
+pub mod path_picker;
 pub mod renderer;
 pub mod save;
 pub mod statusbar;
